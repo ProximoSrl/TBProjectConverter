@@ -11,10 +11,13 @@ namespace PrxmTBUtils.Tests
         [Fact]
         public void should_convert_with_ma_options()
         {
-            var expected = File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "samples", "updated.vcxproj"));
+            var rootFolder = Path.GetDirectoryName(typeof(ProjectUpdater).Assembly.CodeBase).Replace("file:\\","");
+
+            var expected = File.ReadAllText(Path.Combine(rootFolder, "samples", "updated.vcxproj"));
 
             var updater = new ProjectUpdater();
-            var source = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "samples", "original.vcxproj");
+
+            var source = Path.Combine(rootFolder, "samples", "original.vcxproj");
 
             var result = updater.ConvertFromFile(source);
 
