@@ -1,5 +1,7 @@
 ﻿using System;
-using Microsoft.Extensions.CommandLineUtils;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace TBProjectConverter
 {
@@ -7,43 +9,55 @@ namespace TBProjectConverter
     {
         static void Main(string[] args)
         {
-            var app = new CommandLineApplication
+            if (args.Length < 1)
             {
-                Name = "TBProjectConverter",
-                Description = "TaskBuilder command line utils"
-            };
-            app.HelpOption("-?|-h|--help");
+                Console.WriteLine("Usage: dotnet run -- path\\to\\Application.Config");
+                return;
+            }
 
-            var recursive = app.Option
-            (
-                "-r|--recursive",
-                "Recursive folder scan",
-                CommandOptionType.NoValue
-            );
+            var pathToAppConfig = args[0];
 
-            var backup = app.Option
-            (
-                "-b|--backup",
-                "Backup original files",
-                CommandOptionType.SingleValue
-            );
-
-            app.OnExecute(() =>
+            if (!pathToAppConfig.ToLowerInvariant().Contains("application.config"))
             {
-                if (recursive.HasValue())
+                pathToAppConfig = Path.Combine(pathToAppConfig, "Application.Config");
+            }
+
+            if (!File.Exists(pathToAppConfig))
+            {
+                Console.WriteLine("Application.Config File not found!");
+                return;
+            }
+
+            ProcessFolder(Path.GetDirectoryName(pathToAppConfig));
+        }
+
+        static void ProcessFolder(string pathToFolder)
+        {
+            Console.WriteLine("Starting");
+            var projects = Directory.GetFiles(pathToFolder, "*.vcxproj", SearchOption.AllDirectories);
+            var updater = new ProjectUpdater();
+
+            Parallel.ForEach
+            (
+                projects, 
+                new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                project =>
                 {
-                    // todo
+                    // backup
+                    var backupFile = project + ".bak";
+                    if (File.Exists(backupFile))
+                    {
+                        File.Delete(backupFile);
+                    }
+
+                    File.Copy(project, backupFile);
+
+                    // process
+                    var upgraded = updater.ConvertFromFile(project);
+                    File.WriteAllText(project, upgraded);
+                    Console.WriteLine($"Upgraded {project}");
                 }
-
-                if (backup.HasValue())
-                {
-                    // todo
-                }
-
-                return 0;
-            });
-
-            app.Execute(args);
+            );
         }
     }
 }

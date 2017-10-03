@@ -13,13 +13,59 @@ namespace TBProjectConverter
     {
         public string ConvertFromFile(string pathToFile)
         {
-            var doc = XDocument.Load(pathToFile);
+            return ConvertFromSource(File.ReadAllText(pathToFile));
+        }
+
+        private void EnsureNodeWithAttributeAndValue(IEnumerable<XElement> parents, string node, string attrname, string value)
+        {
+            foreach (var parent in parents)
+            {
+                var child = parent.Descendants().SingleOrDefault(x => 
+                    x.Name.LocalName == node &&
+                    x.Attributes().Any(a=>a.Name.LocalName == attrname && a.Value == value) 
+                );
+
+                if (child == null)
+                {
+                    parent.Add(new XElement(node,
+                        new XAttribute(attrname, value))
+                    );
+                }
+            }
+        }
+
+        private void EnsureNodeWithValue(IEnumerable<XContainer> parents, string node, string value)
+        {
+            foreach (var parent in parents)
+            {
+                EnsureNodeWithValue(parent, node, value);
+            }
+        }
+
+        private void EnsureNodeWithValue(XContainer parent, string node, string value)
+        {
+            var child = parent.Descendants().SingleOrDefault(x => x.Name.LocalName == node);
+
+            if (child != null)
+            {
+                child.Value = value;
+            }
+            else
+            {
+                parent.Add(new XElement(node, value));
+            }
+        }
+
+        public string ConvertFromSource(string source)
+        {
+            var doc = XDocument.Parse(source);
             var namespaceManager = new XmlNamespaceManager(new NameTable());
             namespaceManager.AddNamespace("prj", "http://schemas.microsoft.com/developer/msbuild/2003");
 
             // find
             var globals = doc.XPathSelectElement("/prj:Project/prj:PropertyGroup[@Label=\'Globals\']", namespaceManager);
             var configs = doc.XPathSelectElements("/prj:Project/prj:PropertyGroup[@Label=\'Configuration\']", namespaceManager);
+
             var propertySheets = doc.XPathSelectElements("/prj:Project/prj:ImportGroup[@Label=\'PropertySheets\']", namespaceManager);
             var includeDirectories = doc.XPathSelectElements("/prj:Project/prj:ItemDefinitionGroup/prj:ClCompile/prj:AdditionalIncludeDirectories", namespaceManager);
             var functionLevelLinking = doc.XPathSelectElements("/prj:Project/prj:ItemDefinitionGroup/prj:ClCompile/prj:FunctionLevelLinking", namespaceManager);
@@ -28,24 +74,18 @@ namespace TBProjectConverter
             var additionalDependencies = doc.XPathSelectElements("/prj:Project/prj:ItemDefinitionGroup/prj:Link/prj:AdditionalDependencies", namespaceManager);
             var additionalLibraryDirectories = doc.XPathSelectElements("/prj:Project/prj:ItemDefinitionGroup/prj:Link/prj:AdditionalLibraryDirectories", namespaceManager);
 
-            // update
-            globals.Add(new XElement("WindowsTargetPlatformVersion", "8.1"));
+            EnsureNodeWithValue(globals, "WindowsTargetPlatformVersion", "8.1");
+            EnsureNodeWithValue(configs, "PlatformToolset", "v140");
 
-            foreach (var configSection in configs)
-            {
-                configSection.Add(new XElement("PlatformToolset", "v140"));
-            }
+            EnsureNodeWithAttributeAndValue(propertySheets, "Import", "Project", "..\\..\\..\\ERP\\ERP.props");
 
-            foreach (var propertySheet in propertySheets)
-            {
-                propertySheet.Add(new XElement("Import",
-                    new XAttribute("Project", "..\\..\\..\\ERP\\ERP.props"))
-                );
-            }
 
             foreach (var include in includeDirectories)
             {
-                include.Value = "$(TBOCDev);" + include.Value;
+                if (!include.Value.ToLowerInvariant().Contains("$(tbocdev)"))
+                {
+                    include.Value = "$(TBOCDev);" + include.Value;
+                }
             }
 
             foreach (var fnlink in functionLevelLinking)
@@ -58,10 +98,7 @@ namespace TBProjectConverter
                 setting.Value = "true";
             }
 
-            foreach (var clcompile in clcompileoptions)
-            {
-                clcompile.Add(new XElement("AdditionalOptions", "/Zm180 %(AdditionalOptions)"));
-            }
+            EnsureNodeWithValue(clcompileoptions, "AdditionalOptions", "/Zm180 %(AdditionalOptions)");
 
             var exclusions = new[] { "tboledb.lib", "tbgenlib.lib" };
 
@@ -75,7 +112,10 @@ namespace TBProjectConverter
 
             foreach (var lib in additionalLibraryDirectories)
             {
-                lib.Value = lib.Value + ";$(TBOCLib)";
+                if (!lib.Value.ToLowerInvariant().Contains("$(tboclib)"))
+                {
+                    lib.Value = lib.Value + ";$(TBOCLib)";
+                }
             }
 
             return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n" + doc.ToString()
