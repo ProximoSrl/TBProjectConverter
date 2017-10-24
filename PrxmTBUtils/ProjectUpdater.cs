@@ -100,7 +100,7 @@ namespace TBProjectConverter
 
             EnsureNodeWithValue(clcompileoptions, "AdditionalOptions", "/Zm180 %(AdditionalOptions)");
 
-            var exclusions = new[] { "tboledb.lib", "tbgenlib.lib" };
+            var exclusions = new[] { "tboledb.lib", "tbgenlib.lib", "tbgenlibui.lib", "tbwoormengine.lib" };
 
             foreach (var include in additionalDependencies)
             {
