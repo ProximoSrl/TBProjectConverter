@@ -75,7 +75,7 @@ namespace TBProjectConverter
             var additionalLibraryDirectories = doc.XPathSelectElements("/prj:Project/prj:ItemDefinitionGroup/prj:Link/prj:AdditionalLibraryDirectories", namespaceManager);
 
             EnsureNodeWithValue(globals, "WindowsTargetPlatformVersion", "8.1");
-            EnsureNodeWithValue(configs, "PlatformToolset", "v140");
+            EnsureNodeWithValue(configs, "PlatformToolset", "v141");
 
             EnsureNodeWithAttributeAndValue(propertySheets, "Import", "Project", "..\\..\\..\\ERP\\ERP.props");
 
